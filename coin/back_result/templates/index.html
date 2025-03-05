@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>交易分析</title>
+    <!-- Materialize CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
+    <!-- Material Icons -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <!-- Google Fonts: Poppins -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            background-color: #f5f7fa;
+            font-family: 'Poppins', sans-serif;
+            font-size: 14px;
+            color: #4a4a4a;
+        }
+        .container {
+            margin-top: 20px;
+            max-width: 1280px;
+        }
+        h1 {
+            font-size: 28px;
+            color: #2d3748;
+            font-weight: 600;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        h2 {
+            font-size: 20px;
+            color: #2d3748;
+            font-weight: 500;
+            margin-bottom: 20px;
+        }
+        /* 通用卡片样式 */
+        .card {
+            border-radius: 12px;
+            background: linear-gradient(145deg, #ffffff, #f9fafb);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+        }
+        .card-content {
+            padding: 15px !important;
+        }
+        .card-title {
+            font-size: 14px !important;
+            color: #2d3748;
+            display: flex;
+            align-items: center;
+            font-weight: 500;
+        }
+        .card p {
+            font-size: 16px;
+            margin: 8px 0 0;
+            font-weight: 500;
+            color: #1a202c;
+        }
+        /* 颜色调整 */
+        .positive {
+            color: #48bb78 !important; /* 草绿色 */
+        }
+        .negative {
+            color: #f56565 !important; /* 珊瑚红 */
+        }
+        .neutral {
+            color: #718096 !important; /* 灰色 */
+        }
+        /* 图表容器 */
+        .chart-container {
+            background: #ffffff;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            margin-bottom: 30px;
+            opacity: 0;
+            animation: fadeIn 0.5s ease forwards;
+        }
+        .metric-icon {
+            margin-right: 8px;
+            font-size: 20px;
+            color: #5a67d8; /* 柔和紫色 */
+        }
+        canvas {
+            max-height: 350px;
+        }
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .row {
+            margin-bottom: 15px;
+        }
+        .col {
+            padding: 5px !important;
+        }
+        /* 交易记录卡片样式 */
+        .trade-card {
+            margin-bottom: 15px;
+            padding: 15px;
+            border-radius: 12px;
+            background: linear-gradient(145deg, #ffffff, #f9fafb);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .trade-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+        }
+        .trade-field {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            border-bottom: 1px solid #edf2f7;
+        }
+        .trade-field:last-child {
+            border-bottom: none;
+        }
+        .trade-label {
+            font-weight: 500;
+            color: #2d3748;
+            font-size: 13px;
+        }
+        .trade-value {
+            font-weight: 400;
+            color: #4a5568;
+            font-size: 13px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 标题 -->
+        <h1>交易分析</h1>
+
+        <!-- 资金曲线 -->
+        <div class="chart-container">
+            <h2>资金曲线</h2>
+            <canvas id="equityChart"></canvas>
+        </div>
+
+        <!-- 交易指标 -->
+        <h2>交易指标</h2>
+        <div class="row">
+            <div class="col s12 m6 l4">
+                <div class="card">
+                    <div class="card-content">
+                        <span class="card-title"><i class="material-icons metric-icon">trending_up</i>胜率</span>
+                        <p>{{ metrics.win_rate | round(2) }}%</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col s12 m6 l4">
+                <div class="card {{ 'positive' if metrics.total_profit > 0 else 'negative' }}">
+                    <div class="card-content">
+                        <span class="card-title"><i class="material-icons metric-icon">monetization_on</i>总利润</span>
+                        <p>{{ metrics.total_profit | round(2) }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col s12 m6 l4">
+                <div class="card">
+                    <div class="card-content">
+                        <span class="card-title"><i class="material-icons metric-icon">compare_arrows</i>盈亏比</span>
+                        <p>{{ metrics.profit_factor | round(2) }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col s12 m6 l4">
+                <div class="card">
+                    <div class="card-content">
+                        <span class="card-title"><i class="material-icons metric-icon">account_balance_wallet</i>总手续费</span>
+                        <p>{{ metrics.total_fee | round(2) }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col s12 m6 l4">
+                <div class="card">
+                    <div class="card-content">
+                        <span class="card-title"><i class="material-icons metric-icon">arrow_upward</i>多头盈利次数</span>
+                        <p>{{ metrics.long_winning_trades }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col s12 m6 l4">
+                <div class="card">
+                    <div class="card-content">
+                        <span class="card-title"><i class="material-icons metric-icon">arrow_downward</i>空头盈利次数</span>
+                        <p>{{ metrics.short_winning_trades }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col s12 m6 l4">
+                <div class="card">
+                    <div class="card-content">
+                        <span class="card-title"><i class="material-icons metric-icon">bar_chart</i>总交易次数</span>
+                        <p>{{ metrics.total_trades }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col s12 m6 l4">
+                <div class="card">
+                    <div class="card-content">
+                        <span class="card-title"><i class="material-icons metric-icon">thumb_up</i>盈利交易次数</span>
+                        <p>{{ metrics.winning_trades }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col s12 m6 l4">
+                <div class="card">
+                    <div class="card-content">
+                        <span class="card-title"><i class="material-icons metric-icon">thumb_down</i>亏损交易次数</span>
+                        <p>{{ metrics.losing_trades }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col s12 m6 l4">
+                <div class="card">
+                    <div class="card-content">
+                        <span class="card-title"><i class="material-icons metric-icon">timer</i>平均持仓时间</span>
+                        <p>{{ metrics.avg_holding_time | round(2) }} 分钟</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col s12 m6 l4">
+                <div class="card">
+                    <div class="card-content">
+                        <span class="card-title"><i class="material-icons metric-icon">trending_down</i>最大回撤</span>
+                        <p>{{ metrics.max_drawdown | round(2) }}%</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 利润分布 -->
+        <div class="chart-container">
+            <h2>利润分布</h2>
+            <canvas id="profitDistribution"></canvas>
+        </div>
+
+        <!-- 交易记录 -->
+        <h2>交易记录</h2>
+        <div class="row">
+            {% for trade in table %}
+            <div class="col s12 m6 l4">
+                <div class="trade-card">
+                    <div class="trade-field">
+                        <span class="trade-label">交易类型</span>
+                        <span class="trade-value">
+                            {% if trade.type == 'buy' %}买入
+                            {% elif trade.type == 'sell' %}卖出
+                            {% elif trade.type == 'close_long' %}平多
+                            {% elif trade.type == 'close_short' %}平空
+                            {% else %}{{ trade.type }}{% endif %}
+                        </span>
+                    </div>
+                    <div class="trade-field">
+                        <span class="trade-label">价格</span>
+                        <span class="trade-value">{{ trade.price | round(2) if trade.price is not none else '未知' }}</span>
+                    </div>
+                    <div class="trade-field">
+                        <span class="trade-label">数量</span>
+                        <span class="trade-value">{{ trade.quantity | round(6) if trade.quantity is not none else '未知' }}</span>
+                    </div>
+                    <div class="trade-field">
+                        <span class="trade-label">余额</span>
+                        <span class="trade-value">{{ trade.balance | round(2) if trade.balance is not none else '未知' }}</span>
+                    </div>
+                    <div class="trade-field">
+                        <span class="trade-label">仓位</span>
+                        <span class="trade-value">{{ trade.position | round(6) if trade.position is not none else '未知' }}</span>
+                    </div>
+                    <div class="trade-field">
+                        <span class="trade-label">保证金</span>
+                        <span class="trade-value">{{ trade.margin | round(2) if trade.margin is not none else '未知' }}</span>
+                    </div>
+                    <div class="trade-field">
+                        <span class="trade-label">止损价格</span>
+                        <span class="trade-value">{{ trade.stop_loss_price | round(2) if trade.stop_loss_price is not none else '未知' }}</span>
+                    </div>
+                    <div class="trade-field">
+                        <span class="trade-label">止盈价格</span>
+                        <span class="trade-value">{{ trade.take_profit_price | round(2) if trade.take_profit_price is not none else '未知' }}</span>
+                    </div>
+                    <div class="trade-field">
+                        <span class="trade-label">手续费</span>
+                        <span class="trade-value">{{ trade.fee | round(2) if trade.fee is not none else '未知' }}</span>
+                    </div>
+                    <div class="trade-field">
+                        <span class="trade-label">时间</span>
+                        <span class="trade-value">{{ trade.timestamp if trade.timestamp else '未知' }}</span>
+                    </div>
+                    <div class="trade-field">
+                        <span class="trade-label">收益</span>
+                        <span class="trade-value {{ 'positive' if trade.profit > 0 else 'negative' if trade.profit < 0 else 'neutral' }}">
+                            {{ trade.profit | round(2) if trade.profit is not none else '未知' }}
+                        </span>
+                    </div>
+                    <div class="trade-field">
+                        <span class="trade-label">原因</span>
+                        <span class="trade-value">{{ trade.reason if trade.reason else '未知' }}</span>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Materialize JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+    <script>
+        // 资金曲线数据处理
+        let equityValues = [];
+        let equityLabels = [];
+        try {
+            const equityCurve = {{ equity_curve | tojson | safe }} || [];
+            equityValues = equityCurve.map(item => item.balance || 0); // 使用 balance 而不是 cumulative_profit
+            equityLabels = equityValues.map((_, index) => (index + 1).toString());
+        } catch (e) {
+            console.error('解析资金曲线数据失败:', e);
+            equityLabels = ['1', '2', '3', '4', '5', '6'];
+            equityValues = [0, 0, 0, 0, 0, 0];
+        }
+
+        const equityData = {
+            labels: equityLabels,
+            datasets: [{
+                label: '账户余额',
+                data: equityValues,
+                borderColor: '#5a67d8',
+                backgroundColor: 'rgba(90, 103, 216, 0.1)',
+                fill: true,
+                tension: 0.4,
+                pointRadius: 4,
+                pointBackgroundColor: '#5a67d8'
+            }]
+        };
+
+        new Chart(document.getElementById('equityChart'), {
+            type: 'line',
+            data: equityData,
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top',
+                        labels: {
+                            font: {
+                                size: 12,
+                                family: "'Poppins', sans-serif"
+                            }
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: '#2d3748',
+                        titleFont: { size: 12, family: "'Poppins', sans-serif" },
+                        bodyFont: { size: 12, family: "'Poppins', sans-serif" },
+                        padding: 10
+                    }
+                },
+                scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text: '交易序号',
+                            font: { size: 12, family: "'Poppins', sans-serif" }
+                        },
+                        ticks: {
+                            font: { size: 10, family: "'Poppins', sans-serif" }
+                        }
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: '账户余额',
+                            font: { size: 12, family: "'Poppins', sans-serif" }
+                        },
+                        ticks: {
+                            font: { size: 10, family: "'Poppins', sans-serif" }
+                        }
+                    }
+                }
+            }
+        });
+
+        // 利润分布数据处理
+        let profitLabels = [];
+        let profitValues = [];
+        try {
+            const profits = {{ profits | tojson | safe }} || [];
+            if (profits.length === 0) throw new Error("利润数据为空");
+            const bins = {};
+            profits.forEach(profit => {
+                const rounded = Math.round(profit / 10) * 10;
+                bins[rounded] = (bins[rounded] || 0) + 1;
+            });
+            profitLabels = Object.keys(bins).map(Number).sort((a, b) => a - b);
+            profitValues = profitLabels.map(label => bins[label]);
+        } catch (e) {
+            console.error('解析利润分布数据失败:', e);
+            profitLabels = ['-10', '0', '10'];
+            profitValues = [0, 0, 0];
+        }
+
+        const profitData = {
+            labels: profitLabels,
+            datasets: [{
+                label: '利润分布',
+                data: profitValues,
+                backgroundColor: 'rgba(90, 103, 216, 0.3)',
+                borderColor: '#5a67d8',
+                borderWidth: 1
+            }]
+        };
+
+        new Chart(document.getElementById('profitDistribution'), {
+            type: 'bar',
+            data: profitData,
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top',
+                        labels: {
+                            font: {
+                                size: 12,
+                                family: "'Poppins', sans-serif"
+                            }
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: '#2d3748',
+                        titleFont: { size: 12, family: "'Poppins', sans-serif" },
+                        bodyFont: { size: 12, family: "'Poppins', sans-serif" },
+                        padding: 10
+                    }
+                },
+                scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text: '利润区间',
+                            font: { size: 12, family: "'Poppins', sans-serif" }
+                        },
+                        ticks: {
+                            font: { size: 10, family: "'Poppins', sans-serif" }
+                        }
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: '频次',
+                            font: { size: 12, family: "'Poppins', sans-serif" }
+                        },
+                        ticks: {
+                            font: { size: 10, family: "'Poppins', sans-serif" }
+                        }
+                    }
+                }
+            }
+        });
+    </script>
+</body>
+</html>
