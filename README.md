@@ -22,97 +22,95 @@
     pip install -r requirements.txt
 （如果没有 `requirements.txt`，推荐手动安装 `pandas`、`numpy`、`requests`、`flask` 等库。）
 
-## 使用方法
+#如何使用
+请打开main.py查看
 
-### 1. 运行默认回测
-直接跑入口文件（假设为 `main.py`）：
-'''bash
-python main.py
+#如何用AI编写策略来回测
 
-'''python
-# 导入所需的模块和类
-# BacktestEngine: 用于运行回测的核心引擎
-# FakeBroker: 模拟经纪人，用于虚拟交易环境
-# binance_data_source: 从Binance获取数据的模块
-# get_kline_data: 获取K线数据的函数
-# 各种策略类（ATR、布林带、双均线等）: 不同的交易策略实现
-from coin.backtest_engine.engine import BacktestEngine
-from coin.broker.fake_broker import FakeBroker
-from coin.data_source import binance_data_source
-from coin.data_source.binance_data_source import get_kline_data
-from coin.strategy.atr import ATRSellStrategy
-from coin.strategy.bband import BollingerRSIStrategy
-from coin.strategy.double_ma import DoubleMAStrategy
-from coin.strategy.rsib import RSIBollingerStrategy
+想实现自己的策略？可以用 AI（比如 ChatGPT）帮忙写。以下是具体步骤：
+3.1 参考默认策略
+我们先看一个内置的 DoubleMAStrategy（双均线策略）实现，代码简化后如下（假设在 coin/strategy/double_ma.py 中）：
+python
 
+import pandas as pd
 
-def test():
-    # 初始化 FakeBroker（模拟经纪人）
-    # initial_balance: 初始资金，这里设置为1000（单位通常为USDT）
-    # leverage: 杠杆倍数，这里设置为100倍，放大收益和风险
-    # fee_rate: 交易手续费率，这里为0.04%（即0.0004）
-    # open_ratio: 开仓比例，0.2表示每次交易使用20%的可用资金
-    # stop_loss: 止损比例，0.04表示下跌4%时自动平仓止损
-    # take_profit: 止盈比例，0.08表示上涨8%时自动平仓止盈
-    broker = FakeBroker(
-        initial_balance=1000,
-        leverage=100,
-        fee_rate=0.0004,
-        open_ratio=0.2,
-        stop_loss=0.04,
-        take_profit=0.08
-    )
+class DoubleMAStrategy:
+    def __init__(self, fast_window=5, slow_window=20):
+        self.fast_window = fast_window  # 快均线周期
+        self.slow_window = slow_window  # 慢均线周期
 
-    # 初始化交易策略
-    # 这里提供了多种策略供选择，通过注释切换不同策略
-    # BollingerRSIStrategy: 结合布林带和RSI指标的策略
-    # ATRSellStrategy: 基于ATR（平均真实波幅）的卖出策略
-    # RSIBollingerStrategy: 结合RSI和布林带的策略
-    # DoubleMAStrategy: 双均线策略（默认使用此策略）
-    # 你可以根据需要取消注释并选择不同的策略进行测试
-    # strategy = BollingerRSIStrategy(
-    #     bollinger_window=20,  # 布林带窗口期
-    #     bollinger_std=2,     # 布林带标准差倍数
-    #     rsi_window=14,       # RSI计算窗口期
-    #     rsi_threshold=60     # RSI阈值
-    # )
-    # strategy = ATRSellStrategy()
-    # strategy = RSIBollingerStrategy()
-    strategy = DoubleMAStrategy()
+    def on_data(self, data):
+        # 计算快慢均线
+        data['fast_ma'] = data['close'].rolling(window=self.fast_window).mean()
+        data['slow_ma'] = data['close'].rolling(window=self.slow_window).mean()
 
-    # 初始化回测引擎
-    # BacktestEngine 需要两个参数：
-    # broker: 模拟经纪人对象，用于执行虚拟交易
-    # strategy: 交易策略对象，用于决定买卖信号
-    engine = BacktestEngine(broker, strategy)
+        # 最后一根K线
+        last_row = data.iloc[-1]
+        prev_row = data.iloc[-2]
 
-    # 获取K线数据用于回测
-    # get_kline_data 参数说明：
-    # "BTCUSDT": 交易对，这里使用比特币对USDT
-    # "30m": 时间周期，这里为30分钟K线
-    # 5000: 获取最近5000条K线数据
-    data = binance_data_source.get_kline_data("BTCUSDT", "30m", 5000)
+        # 买入信号：快均线上穿慢均线
+        if (prev_row['fast_ma'] < prev_row['slow_ma'] and 
+            last_row['fast_ma'] > last_row['slow_ma']):
+            return 'buy'
+        # 卖出信号：快均线下穿慢均线
+        elif (prev_row['fast_ma'] > prev_row['slow_ma'] and 
+              last_row['fast_ma'] < last_row['slow_ma']):
+            return 'sell'
+        return None
 
-    # 运行回测
-    # engine.run 会根据提供的数据和策略，模拟交易并计算结果
-    # 结果通常包括盈亏、交易次数、胜率等统计信息
-    engine.run(data)
+这个策略的核心是：
+用 fast_window 和 slow_window 计算两条均线。
 
-# 程序入口
-# 当文件作为主程序运行时，执行 test() 函数
-if __name__ == '__main__':
-    test()
+在 on_data 方法中，基于均线交叉生成买卖信号。
 
-默认会用 `DoubleMAStrategy` 策略，基于 BTCUSDT 的 30 分钟 K 线回测 5000 条数据。
+3.2 让 AI 模仿写新策略
+假设你想写一个“MACD 策略”，可以把上面的 DoubleMAStrategy 代码发给 AI（比如 ChatGPT），然后描述需求：
+模仿这个 DoubleMAStrategy 的写法，帮我写一个 MACD 策略，规则是：MACD 线（快线减慢线）上穿信号线时买入，下穿时卖出。快线用 12 周期，慢线用 26 周期，信号线用 9 周期。
 
-回测完成后，程序会启动一个本地 Web 服务器（默认 `http://localhost:5000`），自动打开浏览器展示结果。界面包括：
-- 资金曲线图
-- 交易记录表格
-- 统计数据（总收益、胜率、最大回撤等）
+AI 可能会生成类似下面的代码：
+python
 
-#### Web UI 示例
-下面是回测结果的 Web UI 截图：  
-![Web UI 示例](screenshots/web-ui-example.png)
+import pandas as pd
+
+class MACDStrategy:
+    def __init__(self, fast_period=12, slow_period=26, signal_period=9):
+        self.fast_period = fast_period
+        self.slow_period = slow_period
+        self.signal_period = signal_period
+
+    def on_data(self, data):
+        # 计算快线和慢线（EMA）
+        fast_ema = data['close'].ewm(span=self.fast_period, adjust=False).mean()
+        slow_ema = data['close'].ewm(span=self.slow_period, adjust=False).mean()
+        
+        # 计算 MACD 线
+        macd_line = fast_ema - slow_ema
+        # 计算信号线
+        signal_line = macd_line.ewm(span=self.signal_period, adjust=False).mean()
+
+        # 最后一根和前一根的数据
+        last_macd = macd_line.iloc[-1]
+        last_signal = signal_line.iloc[-1]
+        prev_macd = macd_line.iloc[-2]
+        prev_signal = signal_line.iloc[-2]
+
+        # 买入信号：MACD 上穿信号线
+        if prev_macd < prev_signal and last_macd > last_signal:
+            return 'buy'
+        # 卖出信号：MACD 下穿信号线
+        elif prev_macd > prev_signal and last_macd < last_signal:
+            return 'sell'
+        return None
+
+3.3 使用新策略
+把 AI 写的策略保存到 coin/strategy 文件夹，比如 macd.py，然后在主程序里调用：
+python
+
+from coin.strategy.macd import MACDStrategy
+
+strategy = MACDStrategy()
+engine = BacktestEngine(broker, strategy)
+engine.run(data)
 
 
 
