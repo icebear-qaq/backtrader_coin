@@ -14,7 +14,7 @@
 ## 安装
 1. 确保你有 Python 3.6+。
 2. 克隆项目：
-    git clone https://github.com/icebear-qaq/backtrader_coin.git
+  '''  git clone https://github.com/icebear-qaq/backtrader_coin.git
     cd backtrader_coin
 
 
