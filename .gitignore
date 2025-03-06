@@ -1,0 +1,14 @@
+﻿# 忽略虚拟环境文件夹
+.venv/
+venv/
+
+# 忽略 PyCharm 的配置文件夹
+.idea/
+
+# 其他常见忽略文件
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.log
+*.tmp
